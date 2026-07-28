@@ -1,0 +1,75 @@
+server:
+  port: 8008
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+
+      routes:
+        - id: identity-access-management-service
+          uri: lb://identity-access-management-service
+          predicates:
+            - Path=/api/auth/**,/api/users/**,/api/audit-logs/**,/api/learning-reports/**
+
+        - id: course-catalog-content-management-service
+          uri: lb://course-catalog-content-management-service
+          predicates:
+            - Path=/api/courses/**,/api/learning-paths/**
+
+        - id: assessment-evaluation-service
+          uri: lb://assessment-evaluation-service
+          predicates:
+            - Path=/api/assessments/**,/api/attempts/**
+
+        - id: enrollment-learning-progress-service
+          uri: lb://enrollment-learning-progress-service
+          predicates:
+            - Path=/api/enrollments/**,/api/module-progress/**
+
+        - id: instructor-session-management-service
+          uri: lb://instructor-session-management-service
+          predicates:
+            - Path=/api/instructors/**,/api/training-sessions/**,/api/session-registrations/**,/api/session-feedback/**
+
+        - id: certification-badge-management-service
+          uri: lb://certification-badge-management-service
+          predicates:
+            - Path=/api/certifications/**,/api/badges/**,/api/badge-awards/**
+
+        - id: learning-analytics-reporting-service
+          uri: lb://learning-analytics-reporting-service
+          predicates:
+            - Path=/api/analytics/**,/api/reports/**
+
+        - id: notification-alert-service
+          uri: lb://notification-alert-service
+          predicates:
+            - Path=/api/notifications/**
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.netflix.discovery: DEBUG
+    org.springframework.cloud.netflix.eureka: DEBUG
