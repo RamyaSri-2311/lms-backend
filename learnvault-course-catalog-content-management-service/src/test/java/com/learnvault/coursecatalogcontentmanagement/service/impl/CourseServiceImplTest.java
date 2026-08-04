@@ -53,7 +53,7 @@ class CourseServiceImplTest {
                 .deliveryMode(DeliveryMode.SELFPACED)
                 .status(CourseStatus.DRAFT)
                 .build();
-        when(courseRepository.existsByTitleIgnoreCase("Java Basics")).thenReturn(false);
+        when(courseRepository.existsByTitleIgnoreCaseAndLevel("Java Basics", CourseLevel.BEGINNER)).thenReturn(false);
         when(courseRepository.save(any(Course.class))).thenReturn(saved);
 
         // Act
@@ -76,8 +76,8 @@ class CourseServiceImplTest {
     }
 
     @Test
-    void createCourse_duplicateTitle_throwsBadRequest() {
-        // Arrange: a course with the same title already exists
+    void createCourse_duplicateTitleAndLevel_throwsBadRequest() {
+        // Arrange: a course with the same title AND same level already exists
         CourseRequest request = CourseRequest.builder()
                 .title("Java Basics")
                 .category("Programming")
@@ -85,7 +85,7 @@ class CourseServiceImplTest {
                 .durationHours(10)
                 .deliveryMode(DeliveryMode.SELFPACED)
                 .build();
-        when(courseRepository.existsByTitleIgnoreCase("Java Basics")).thenReturn(true);
+        when(courseRepository.existsByTitleIgnoreCaseAndLevel("Java Basics", CourseLevel.BEGINNER)).thenReturn(true);
 
         // Act & Assert
         assertThrows(BadRequestException.class, () -> courseService.createCourse(request));

@@ -33,6 +33,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Time;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -90,6 +92,19 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
         if (!end.after(start)) {
             throw new BadRequestException("End time must be greater than start time.");
         }
+
+        // The session must be scheduled for a future slot, not one that has already passed.
+        if (request.getSessionDate() == null) {
+            throw new BadRequestException("Session date is required.");
+        }
+        LocalDateTime slotStart = LocalDateTime.of(request.getSessionDate(), start.toLocalTime());
+        if (slotStart.isBefore(LocalDateTime.now())) {
+            throw new BadRequestException(
+                    "Please select a valid future date and time — the selected slot has already passed.");
+        }
+
+        // An instructor can only conduct one session at a time — reject overlaps.
+        assertNoScheduleConflict(request.getInstructorId(), request.getSessionDate(), start, end, null);
 
         TrainingSession session = TrainingSession.builder()
                 .courseId(request.getCourseId())
@@ -363,6 +378,37 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
     }
 
     // ---------------- helpers ----------------
+
+    /**
+     * Rejects the request if the instructor already has another session on the same date
+     * whose time range overlaps [start, end). Back-to-back sessions are allowed
+     * (new.start == existing.end or new.end == existing.start). CANCELLED sessions are
+     * ignored. {@code excludeSessionId} skips one session — pass the current id on update.
+     */
+    private void assertNoScheduleConflict(Integer instructorId, LocalDate date,
+                                          Time start, Time end, Integer excludeSessionId) {
+        if (instructorId == null || date == null || start == null || end == null) {
+            return;
+        }
+        List<TrainingSession> sameDay = trainingSessionRepository
+                .findByInstructor_InstructorIdAndSessionDateAndStatusNot(instructorId, date, SessionStatus.CANCELLED);
+        for (TrainingSession existing : sameDay) {
+            if (excludeSessionId != null && excludeSessionId.equals(existing.getSessionId())) {
+                continue;
+            }
+            Time exStart = existing.getStartTime();
+            Time exEnd = existing.getEndTime();
+            if (exStart == null || exEnd == null) {
+                continue;
+            }
+            // Overlap = new starts before existing ends AND new ends after existing starts.
+            boolean overlaps = start.before(exEnd) && end.after(exStart);
+            if (overlaps) {
+                throw new BadRequestException(
+                        "Session cannot be scheduled because the instructor already has another session during the selected time slot.");
+            }
+        }
+    }
 
     private long activeCount(Integer sessionId) {
         return sessionRegistrationRepository

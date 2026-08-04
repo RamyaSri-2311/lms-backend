@@ -15,7 +15,8 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
     List<Course> findByLevel(CourseLevel level);
     List<Course> findByInstructorId(Integer instructorId);
 
-    // Duplicate-title guards (case-insensitive)
-    boolean existsByTitleIgnoreCase(String title);
-    boolean existsByTitleIgnoreCaseAndCourseIdNot(String title, Integer courseId);
+    // Duplicate guards: a title may repeat across levels, but not within the same level
+    // (case-insensitive title match).
+    boolean existsByTitleIgnoreCaseAndLevel(String title, CourseLevel level);
+    boolean existsByTitleIgnoreCaseAndLevelAndCourseIdNot(String title, CourseLevel level, Integer courseId);
 }

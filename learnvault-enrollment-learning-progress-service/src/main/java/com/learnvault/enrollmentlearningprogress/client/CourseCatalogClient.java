@@ -1,13 +1,14 @@
 package com.learnvault.enrollmentlearningprogress.client;
 
 import com.learnvault.enrollmentlearningprogress.client.dto.ModuleDto;
+import com.learnvault.enrollmentlearningprogress.client.fallback.CourseCatalogClientFallback;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.List;
 
-@FeignClient(name = "course-catalog-content-management-service")
+@FeignClient(name = "course-catalog-content-management-service", fallback = CourseCatalogClientFallback.class)
 public interface CourseCatalogClient {
 
     @GetMapping("/api/courses/{courseId}/modules")

@@ -32,10 +32,14 @@ public class CourseServiceImpl implements CourseService {
         log.info("Creating course: {}", request.getTitle());
 
         String title = request.getTitle() != null ? request.getTitle().trim() : null;
+        CourseLevel level = request.getLevel();
 
-        // Prevent duplicate courses (same title, case-insensitive)
-        if (title != null && !title.isEmpty() && courseRepository.existsByTitleIgnoreCase(title)) {
-            throw new BadRequestException("A course titled \"" + title + "\" already exists.");
+        // Prevent duplicate courses: same title (case-insensitive) AND same level.
+        // The same title is allowed across different levels.
+        if (title != null && !title.isEmpty() && level != null
+                && courseRepository.existsByTitleIgnoreCaseAndLevel(title, level)) {
+            throw new BadRequestException(
+                    "A course titled \"" + title + "\" already exists for level " + level + ".");
         }
 
         // Validate the assigned instructor exists and is active (if one is assigned)
@@ -66,10 +70,13 @@ public class CourseServiceImpl implements CourseService {
 
         String title = request.getTitle() != null ? request.getTitle().trim() : null;
 
-        // Prevent renaming to a title already used by another course
-        if (title != null && !title.isEmpty()
-                && courseRepository.existsByTitleIgnoreCaseAndCourseIdNot(title, id)) {
-            throw new BadRequestException("Another course titled \"" + title + "\" already exists.");
+        // Duplicate guard on the resulting title + level, excluding this course itself.
+        String effectiveTitle = (title != null && !title.isEmpty()) ? title : course.getTitle();
+        CourseLevel effectiveLevel = request.getLevel() != null ? request.getLevel() : course.getLevel();
+        if (effectiveTitle != null && effectiveLevel != null
+                && courseRepository.existsByTitleIgnoreCaseAndLevelAndCourseIdNot(effectiveTitle, effectiveLevel, id)) {
+            throw new BadRequestException(
+                    "Another course titled \"" + effectiveTitle + "\" already exists for level " + effectiveLevel + ".");
         }
 
         // Validate instructor only when it actually changes

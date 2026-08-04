@@ -9,6 +9,7 @@ import com.learnvault.identityaccessmanagement.service.LearningReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,8 +23,16 @@ public class LearningReportServiceImpl implements LearningReportService {
     private final LearningReportRepository learningReportRepository;
 
     @Override
+    @Transactional
     public LearningReportResponse generateReport(LearningReportRequest request) {
         log.info("Generating report for scope: {}", request.getScope());
+
+        // Option A: keep only the latest report per scope. Regenerating a report of the
+        // same type replaces any existing ones instead of creating a new record.
+        List<LearningReport> existing = learningReportRepository.findByScope(request.getScope());
+        if (!existing.isEmpty()) {
+            learningReportRepository.deleteAll(existing);
+        }
 
         String metrics = buildMetricsJson(request);
 
@@ -55,21 +64,19 @@ public class LearningReportServiceImpl implements LearningReportService {
 
     @Override
     public LearningReportResponse getSummary() {
-
+        // Read-only aggregate — must NOT persist a report (previously this created a
+        // new SUMMARY row on every call, flooding report history).
         String summaryMetrics =
                 "{\"totalEnrollments\":120," +
                 "\"completionRate\":85," +
                 "\"certifications\":340," +
                 "\"avgScore\":92}";
 
-        LearningReport report = LearningReport.builder()
+        return LearningReportResponse.builder()
                 .scope("SUMMARY")
                 .metrics(summaryMetrics)
+                .generatedDate(LocalDateTime.now())
                 .build();
-
-        LearningReport saved = learningReportRepository.save(report);
-
-        return mapToResponse(saved);
     }
 
     /**

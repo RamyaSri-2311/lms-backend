@@ -59,7 +59,7 @@ class TrainingSessionServiceImplTest {
     private TrainingSessionRequest onlineRequest() {
         return TrainingSessionRequest.builder()
                 .courseId(100).instructorId(1).title("Intro").sessionType(SessionType.ONLINE)
-                .meetingLink("http://meet").sessionDate(LocalDate.now())
+                .meetingLink("http://meet").sessionDate(LocalDate.now().plusDays(1))
                 .startTime("10:00").endTime("11:00").maxCapacity(20).build();
     }
 
@@ -109,6 +109,45 @@ class TrainingSessionServiceImplTest {
         when(instructorRepository.findById(1)).thenReturn(Optional.of(instructor));
         CourseDto course = new CourseDto();
         course.setInstructorId(999); // different instructor owns the course
+        when(courseClient.getCourseById(100)).thenReturn(course);
+
+        // Act + Assert
+        assertThrows(BadRequestException.class, () -> sessionService.scheduleSession(request));
+        verify(trainingSessionRepository, never()).save(any(TrainingSession.class));
+    }
+
+    @Test
+    void scheduleSession_timeConflict_throwsBadRequest() {
+        // Arrange: instructor is assigned, but already has an overlapping session (10:30–11:30)
+        TrainingSessionRequest request = onlineRequest(); // 10:00–11:00
+        Instructor instructor = Instructor.builder().instructorId(1).userId(50).build();
+        when(instructorRepository.findById(1)).thenReturn(Optional.of(instructor));
+        CourseDto course = new CourseDto();
+        course.setInstructorId(1);
+        when(courseClient.getCourseById(100)).thenReturn(course);
+        TrainingSession existing = TrainingSession.builder()
+                .sessionId(9)
+                .startTime(Time.valueOf("10:30:00")).endTime(Time.valueOf("11:30:00"))
+                .status(SessionStatus.SCHEDULED).build();
+        when(trainingSessionRepository.findByInstructor_InstructorIdAndSessionDateAndStatusNot(
+                eq(1), any(), eq(SessionStatus.CANCELLED))).thenReturn(List.of(existing));
+
+        // Act + Assert
+        assertThrows(BadRequestException.class, () -> sessionService.scheduleSession(request));
+        verify(trainingSessionRepository, never()).save(any(TrainingSession.class));
+    }
+
+    @Test
+    void scheduleSession_pastDate_throwsBadRequest() {
+        // Arrange: a date/time that has already passed
+        TrainingSessionRequest request = TrainingSessionRequest.builder()
+                .courseId(100).instructorId(1).title("Intro").sessionType(SessionType.ONLINE)
+                .meetingLink("http://meet").sessionDate(LocalDate.now().minusDays(1))
+                .startTime("10:00").endTime("11:00").maxCapacity(20).build();
+        Instructor instructor = Instructor.builder().instructorId(1).userId(50).build();
+        when(instructorRepository.findById(1)).thenReturn(Optional.of(instructor));
+        CourseDto course = new CourseDto();
+        course.setInstructorId(1);
         when(courseClient.getCourseById(100)).thenReturn(course);
 
         // Act + Assert
